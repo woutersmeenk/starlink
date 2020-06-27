@@ -9,7 +9,6 @@ import (
 	"net/http/cookiejar"
 	"os"
 	"strings"
-	"time"
 )
 
 var (
@@ -34,50 +33,64 @@ type ommRecord struct {
 }
 
 func main() {
-	loginData := getLoginData()
+	client := createClient()
+	login(client)
 
-	cookieJar, _ := cookiejar.New(nil)
+	satcatRecords := findStarlinkSats(client)
 
-	client := &http.Client{
+	fmt.Printf("# Sats: %d\n", len(satcatRecords))
+
+	ommRecords := getOomRecords(client, satcatRecords[0:10])
+	fmt.Printf("# Records: %d\n", len(ommRecords))
+}
+
+func createClient() *http.Client {
+	cookieJar, err := cookiejar.New(nil)
+	check(err)
+
+	return &http.Client{
 		Jar: cookieJar,
 	}
+}
 
+func login(client *http.Client) {
+	loginData := getLoginData()
 	res, err := client.Post(uriBase+requestLogin, "application/json", strings.NewReader(loginData))
 	check(err)
 	checkStatus(res)
+}
 
-	res, err = client.Get(uriBase + requestCmdAction + requestFindStarlinks)
+func findStarlinkSats(client *http.Client) (satcatRecords []satcatRecord) {
+	res, err := client.Get(uriBase + requestCmdAction + requestFindStarlinks)
 	check(err)
 	checkStatus(res)
 
 	decoder := json.NewDecoder(res.Body)
-	var satcatRecords []satcatRecord
 	err = decoder.Decode(&satcatRecords)
 	check(err)
 
-	fmt.Printf("# Sats: %d\n", len(satcatRecords))
+	return satcatRecords
+}
 
-	requests := 1
+func getOomRecords(client *http.Client, satcatRecords []satcatRecord) (ommRecords []ommRecord) {
+	satIds := ""
 	for _, satRecord := range satcatRecords {
-		fmt.Printf("%s %s Launched: %s\n", satRecord.NoradCatID, satRecord.SatName, satRecord.Launch)
-
-		res, err = client.Get(uriBase + requestCmdAction + requestOMMStarlink1 + satRecord.NoradCatID + requestOMMStarlink2)
-		check(err)
-		checkStatus(res)
-		requests++
-
-		decoder := json.NewDecoder(res.Body)
-		var ommRecords []ommRecord
-		err = decoder.Decode(&ommRecords)
-		check(err)
-		fmt.Printf("# Epochs: %d\n", len(ommRecords))
-
-		if requests > 28 {
-			fmt.Printf("Sleep for %s\n", time.Minute)
-			time.Sleep(time.Minute)
-			requests = 0
+		if len(satIds) > 0 {
+			satIds += ","
 		}
+		satIds += satRecord.NoradCatID
+		fmt.Printf("%s %s Launched: %s\n", satRecord.NoradCatID, satRecord.SatName, satRecord.Launch)
 	}
+
+	res, err := client.Get(uriBase + requestCmdAction + requestOMMStarlink1 + satIds + requestOMMStarlink2)
+	check(err)
+	checkStatus(res)
+
+	decoder := json.NewDecoder(res.Body)
+	err = decoder.Decode(&ommRecords)
+	check(err)
+
+	return ommRecords
 }
 
 func getLoginData() string {
