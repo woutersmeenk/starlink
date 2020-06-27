@@ -8,7 +8,9 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"os"
+	"strconv"
 	"strings"
+	"time"
 )
 
 var (
@@ -20,6 +22,10 @@ var (
 	requestOMMStarlink2  = "/orderby/EPOCH%20asc/format/json"
 )
 
+const (
+	epochFormat = "2006-01-02T15:04:05"
+)
+
 type satcatRecord struct {
 	SatName    string `json:"SATNAME"`
 	NoradCatID string `json:"NORAD_CAT_ID"`
@@ -27,9 +33,16 @@ type satcatRecord struct {
 }
 
 type ommRecord struct {
+	NoradCatID  string `json:"NORAD_CAT_ID"`
+	ObjectName  string `json:"OBJECT_NAME"`
 	Epoch       string `json:"EPOCH"`
 	RaOfAscNode string `json:"RA_OF_ASC_NODE"`
 	MeanAnomaly string `json:"MEAN_ANOMALY"`
+}
+
+type satLocation struct {
+	RaOfAscNode float64
+	MeanAnomaly float64
 }
 
 func main() {
@@ -40,8 +53,32 @@ func main() {
 
 	fmt.Printf("# Sats: %d\n", len(satcatRecords))
 
-	ommRecords := getOomRecords(client, satcatRecords[0:10])
+	ommRecords := getOomRecords(client, satcatRecords[5:7])
 	fmt.Printf("# Records: %d\n", len(ommRecords))
+
+	recordsGrouped := make(map[string]map[string]satLocation)
+	for _, ommRecord := range ommRecords {
+		epoch, _ := time.Parse(epochFormat, ommRecord.Epoch)
+		epochDate := epoch.Format("2006-01-02")
+		meanAnomaly, err := strconv.ParseFloat(ommRecord.MeanAnomaly, 64)
+		check(err)
+		raOfAscNode, err := strconv.ParseFloat(ommRecord.RaOfAscNode, 64)
+		check(err)
+		satName := ommRecord.ObjectName
+
+		if _, ok := recordsGrouped[epochDate]; !ok {
+			recordsGrouped[epochDate] = make(map[string]satLocation)
+		}
+		if _, ok := recordsGrouped[epochDate][satName]; !ok {
+			recordsGrouped[epochDate][satName] = satLocation{
+				MeanAnomaly: meanAnomaly,
+				RaOfAscNode: raOfAscNode,
+			}
+		}
+	}
+
+	fmt.Printf("# Dates: %d\n", len(recordsGrouped))
+
 }
 
 func createClient() *http.Client {
