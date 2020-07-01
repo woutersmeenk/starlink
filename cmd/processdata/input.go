@@ -10,7 +10,8 @@ import (
 	"strings"
 )
 
-var (
+// Constants to construct query urls
+const (
 	uriBase              = "https://www.space-track.org"
 	requestLogin         = "/ajaxauth/login"
 	requestCmdAction     = "/basicspacedata/query"
@@ -20,6 +21,7 @@ var (
 )
 
 const (
+	// Format of the date returned
 	epochFormat = "2006-01-02T15:04:05"
 )
 

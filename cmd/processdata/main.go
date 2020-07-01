@@ -15,6 +15,8 @@ func main() {
 	ommRecords := getOomRecords(client, satcatRecords[5:7])
 	fmt.Printf("# Records: %d\n", len(ommRecords))
 
-	groupedRecords := groupRecords(ommRecords)
-	fmt.Printf("# Dates: %d\n", len(groupedRecords))
+	satLaunchDate := groupSatsPerLaunchDate(satcatRecords)
+
+	graphData := createGraphData(ommRecords, satLaunchDate)
+	fmt.Printf("# Dates: %d\n", len(graphData))
 }
